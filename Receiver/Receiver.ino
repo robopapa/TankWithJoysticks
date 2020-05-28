@@ -21,6 +21,7 @@
 #define RIGHT_JOYSTICK  1
 #define SERVO_PIN       9
 #define BREAKE          0
+// #define __DEBUG__       0
 /*********** Adafruit Motor Shield V2.3 ************/
 
 Adafruit_MotorShield AFMS     = Adafruit_MotorShield();
@@ -48,7 +49,7 @@ typedef struct {
   int hPosition;
   bool button;
 } Joystick;
-Joysticks joystick[2];
+Joystick joysticks[2];
 
 /**************************************************/
 
@@ -71,6 +72,7 @@ void setup()
   radio.startListening();
   
   liftupServo.attach(SERVO_PIN); // can also use 8
+  liftupServo.write(0); // set it to flat.
   AFMS.begin();
 }
 
@@ -88,12 +90,12 @@ void loop()
       // now we have the data that was transmitted, so we need to do some logic.
       if(joysticks[RIGHT_JOYSTICK].button == 1 && buttonStatus == Released) {
           buttonStatus  = Pressed;
-          isLiftUp          = true;
+          isLiftUp          = !isLiftUp;
       } else if (joysticks[RIGHT_JOYSTICK].button == 0 && buttonStatus == Pressed) {
         buttonStatus = Released;
       }
 
-      if(isLiftup) {
+      if(isLiftUp) {
         ProcessLiftUp();
       } else {
         ProcessMovement();
@@ -103,7 +105,7 @@ void loop()
 #ifdef __DEBUG__
       PrintValues();
 #endif
-      delay(250);
+      // delay(250);
       done = radio.available();
     }
   }
@@ -119,7 +121,7 @@ void ProcessMovement() {
   // Left Motor
   int value = joysticks[LEFT_JOYSTICK].vPosition;
   leftMotorDirection = GetDirection(value);
-  int speed = GetSpeed(value, leftMotorDirectionFORWARD);
+  int speed = GetSpeed(value, leftMotorDirection);
   leftMotor->setSpeed(speed);
   leftMotor->run(leftMotorDirection);
 
@@ -128,7 +130,7 @@ void ProcessMovement() {
   rightMotorDirection = GetDirection(value);
   speed = GetSpeed(value, rightMotorDirection);
   rightMotor->setSpeed(speed);
-  rightMotor->run(leftMotorDirection);
+  rightMotor->run(rightMotorDirection);
 }
 
 int GetDirection(int value) {
@@ -150,21 +152,29 @@ void ProcessLiftUp(){
   rightMotor->run(RELEASE);
 
   int value = joysticks[RIGHT_JOYSTICK].vPosition;
-  int angle = map(value, 512, 1024, 0, 180);
+  int speed = 0;
+  if(value >= 600) {
+    speed = map(value, 600, 1024, 0, 10);
+  } else if(value <= 424) {
+    speed = map(value, 424, 0, 0, -10);
+  }
+
+  int currentAngle = liftupServo.read();
+  int angle = currentAngle + 1 * speed;
   liftupServo.write(angle);
 }
 
 void PrintValues() {
   Serial.print("Left Joystick:\t");
-  Serial.print(joystick[LEFT_JOYSTICK].vPosition);
+  Serial.print(joysticks[LEFT_JOYSTICK].vPosition);
   Serial.print("\t");
-  Serial.print(joystick[LEFT_JOYSTICK].hPosition);
+  Serial.print(joysticks[LEFT_JOYSTICK].hPosition);
   Serial.print("\t");
-  Serial.println(joystick[LEFT_JOYSTICK].button);
+  Serial.println(joysticks[LEFT_JOYSTICK].button);
   Serial.print("Right Joystick\t");
-  Serial.print(joystick[RIGHT_JOYSTICK].vPosition);
+  Serial.print(joysticks[RIGHT_JOYSTICK].vPosition);
   Serial.print("\t");
-  Serial.print(joystick[RIGHT_JOYSTICK].hPosition);
+  Serial.print(joysticks[RIGHT_JOYSTICK].hPosition);
   Serial.print("\t");
-  Serial.println(joystick[RIGHT_JOYSTICK].button);
+  Serial.println(joysticks[RIGHT_JOYSTICK].button);
 }
